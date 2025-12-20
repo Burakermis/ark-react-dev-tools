@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ARK React DevTools</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #container {
+      display: flex;
+      height: 100vh;
+    }
+
+    #sidebar {
+      width: 350px;
+      background: #252526;
+      border-right: 1px solid #3e3e42;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    #main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    #header {
+      padding: 15px;
+      background: #2d2d30;
+      border-bottom: 1px solid #3e3e42;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #inspectBtn {
+      background: #0e639c;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    #inspectBtn:hover {
+      background: #1177bb;
+    }
+
+    #inspectBtn:active {
+      background: #0d5689;
+    }
+
+    .component-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #3e3e42;
+      transition: background 0.2s;
+    }
+
+    .component-item:hover {
+      background: #2a2d2e;
+    }
+
+    .component-item.selected {
+      background: #094771;
+      border-left: 3px solid #0e639c;
+    }
+
+    .component-name {
+      font-weight: 500;
+      color: #4ec9b0;
+    }
+
+    .component-type {
+      font-size: 12px;
+      color: #858585;
+      margin-left: 8px;
+    }
+
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #569cd6;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #3e3e42;
+    }
+
+    .property {
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .property-key {
+      color: #9cdcfe;
+      font-weight: 500;
+    }
+
+    .property-value {
+      color: #ce9178;
+      margin-left: 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #858585;
+    }
+
+    .tree-item {
+      padding-left: 20px;
+    }
+
+    .tree-toggle {
+      cursor: pointer;
+      display: inline-block;
+      width: 16px;
+      user-select: none;
+      color: #858585;
+    }
+
+    .tree-content {
+      display: none;
+    }
+
+    .tree-content.expanded {
+      display: block;
+    }
+
+    pre {
+      background: #1e1e1e;
+      padding: 12px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 13px;
+      border: 1px solid #3e3e42;
+    }
+
+    .info-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      background: #264f78;
+      border-radius: 3px;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #858585;
+    }
+
+    #stats {
+      font-size: 12px;
+      color: #858585;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="sidebar">
+      <div id="header">
+        <div>
+          <strong>Components</strong>
+          <span id="stats"></span>
+        </div>
+        <button id="inspectBtn">🔍 Inspect</button>
+      </div>
+      <div id="componentTree"></div>
+    </div>
+    <div id="main">
+      <div id="details"></div>
+    </div>
+  </div>
+
+  <script src="panel.js"></script>
+</body>
+</html>
