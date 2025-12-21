@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <title>ARK React DevTools</title>
@@ -174,8 +175,28 @@
       font-size: 12px;
       color: #858585;
     }
+
+    #resizer {
+      width: 5px;
+      background: #3e3e42;
+      cursor: col-resize;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    #resizer:hover,
+    #resizer.resizing {
+      background: #0e639c;
+    }
+
+    /* Prevent text selection while resizing */
+    body.resizing {
+      user-select: none;
+      cursor: col-resize;
+    }
   </style>
 </head>
+
 <body>
   <div id="container">
     <div id="sidebar">
@@ -188,6 +209,7 @@
       </div>
       <div id="componentTree"></div>
     </div>
+    <div id="resizer"></div>
     <div id="main">
       <div id="details"></div>
     </div>
@@ -195,4 +217,5 @@
 
   <script src="panel.js"></script>
 </body>
+
 </html>
