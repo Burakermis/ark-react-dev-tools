@@ -58,6 +58,22 @@
       transition: background 0.2s;
     }
 
+    #searchInput {
+      background: #3e3e42;
+      border: 1px solid #3e3e42;
+      color: #d4d4d4;
+      padding: 6px 10px;
+      border-radius: 4px;
+      width: 100%;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+
+    #searchInput:focus {
+      outline: none;
+      border-color: #0e639c;
+    }
+
     #inspectBtn:hover {
       background: #1177bb;
     }
@@ -131,12 +147,30 @@
       padding-left: 20px;
     }
 
+    .tree-children {
+      margin-left: 16px;
+    }
+
     .tree-toggle {
       cursor: pointer;
       display: inline-block;
       width: 16px;
+      height: 16px;
+      line-height: 16px;
+      text-align: center;
       user-select: none;
       color: #858585;
+      margin-right: 4px;
+      font-size: 10px;
+      transition: transform 0.1s;
+    }
+
+    .tree-toggle:hover {
+      color: #d4d4d4;
+    }
+
+    .tree-toggle.expanded {
+      transform: rotate(90deg);
     }
 
     .tree-content {
@@ -201,11 +235,14 @@
   <div id="container">
     <div id="sidebar">
       <div id="header">
-        <div>
-          <strong>Components</strong>
-          <span id="stats"></span>
+        <div style="flex: 1; margin-right: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong>Components</strong>
+            <span id="stats"></span>
+          </div>
+          <input type="text" id="searchInput" placeholder="Filter components...">
         </div>
-        <button id="inspectBtn">🔍 Inspect</button>
+        <button id="inspectBtn">🔍</button>
       </div>
       <div id="componentTree"></div>
     </div>

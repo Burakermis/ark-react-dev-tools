@@ -59,36 +59,125 @@ function handleReactData(data) {
   }
 }
 
+// Search functionality
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  const filterText = e.target.value.toLowerCase();
+  if (currentData && currentData.components) {
+    const filteredComponents = currentData.components.filter(comp =>
+      comp.name.toLowerCase().includes(filterText)
+    );
+    renderComponentTree(filteredComponents);
+  }
+});
+
 // Component tree'yi render et
-function renderComponentTree(components) {
-  const tree = document.getElementById('componentTree');
-  tree.innerHTML = '';
+// Tree State
+const collapsedIds = new Set();
+// Varsayılan olarak her şey açık (collapsedIds boş)
 
-  const grouped = groupByDepth(components);
+function buildTree(flatList) {
+  const root = { id: 'virtual-root', children: [], depth: -1 };
+  const stack = [root];
 
-  Object.keys(grouped).forEach(depth => {
-    grouped[depth].forEach(component => {
-      const item = createComponentItem(component);
-      tree.appendChild(item);
-    });
-  });
-}
-
-function groupByDepth(components) {
-  const grouped = {};
-  components.forEach(comp => {
-    if (!grouped[comp.depth]) {
-      grouped[comp.depth] = [];
+  flatList.forEach(item => {
+    while (stack.length > 1 && stack[stack.length - 1].depth >= item.depth) {
+      stack.pop();
     }
-    grouped[comp.depth].push(comp);
+
+    const parent = stack[stack.length - 1];
+    const newNode = { ...item, children: [] };
+    parent.children.push(newNode);
+    stack.push(newNode);
   });
-  return grouped;
+
+  return root.children;
 }
 
-function createComponentItem(component) {
+function renderComponentTree(components) {
+  const treeContainer = document.getElementById('componentTree');
+  treeContainer.innerHTML = '';
+
+  // Search aktifse düz liste göster
+  const filterText = document.getElementById('searchInput').value;
+  if (filterText) {
+    components.forEach(comp => {
+      const div = document.createElement('div');
+      div.className = 'component-item';
+      div.style.paddingLeft = '12px';
+
+      const name = document.createElement('span');
+      name.className = 'component-name';
+      name.textContent = comp.name;
+      div.appendChild(name);
+
+      div.addEventListener('click', () => selectComponent(comp));
+      treeContainer.appendChild(div);
+    });
+    return;
+  }
+
+  const tree = buildTree(components);
+  renderTreeNodes(tree, treeContainer);
+}
+
+function renderTreeNodes(nodes, container) {
+  if (!nodes || nodes.length === 0) return;
+
+  nodes.forEach(node => {
+    const nodeEl = createComponentNode(node);
+    container.appendChild(nodeEl);
+
+    if (node.children && node.children.length > 0) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'tree-children';
+      childrenContainer.style.display = collapsedIds.has(node.id) ? 'none' : 'block';
+
+      renderTreeNodes(node.children, childrenContainer);
+      container.appendChild(childrenContainer);
+    }
+  });
+}
+
+function createComponentNode(component) {
   const div = document.createElement('div');
   div.className = 'component-item';
-  div.style.paddingLeft = (component.depth * 10 + 12) + 'px';
+  if (selectedComponent && selectedComponent.id === component.id) {
+    div.classList.add('selected');
+  }
+
+  // Padding based on depth (reset depth since we use nested divs? No, we use flat structure visually but logic is nested)
+  // Wait, if we use nested divs for children (tree-children), we don't need cumulative padding on items!
+  // The padding happens naturally via hierarchy?
+  // Let's check CSS. .tree-children usually has padding-left.
+  // But our CSS doesn't have .tree-children padding yet.
+
+  // Let's use explicit padding and flat visual structure but nested in DOM for standard tree feel.
+  // Actually, standard tree implementation usually shifts children right.
+  // So:
+  // .tree-children { padding-left: 12px; }
+  // And remove variable padding from createComponentNode.
+
+  div.style.paddingLeft = '4px'; // Base padding
+
+  // Toggle Icon
+  const toggle = document.createElement('span');
+  toggle.className = 'tree-toggle';
+  if (component.children && component.children.length > 0) {
+    toggle.textContent = '▶';
+    if (!collapsedIds.has(component.id)) {
+      toggle.classList.add('expanded');
+    }
+
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleComponent(component.id);
+    });
+  } else {
+    toggle.style.opacity = '0';
+    toggle.textContent = '▶';
+    toggle.style.cursor = 'default';
+  }
+  div.appendChild(toggle);
 
   const name = document.createElement('span');
   name.className = 'component-name';
@@ -96,14 +185,31 @@ function createComponentItem(component) {
 
   const type = document.createElement('span');
   type.className = 'component-type';
-  type.textContent = `[${component.type}]`;
+  if (component.key) {
+    type.textContent = ` key="${component.key}"`;
+    type.style.color = '#9cdcfe';
+  } else {
+    type.textContent = '';
+  }
 
   div.appendChild(name);
   div.appendChild(type);
 
-  div.addEventListener('click', () => selectComponent(component));
+  div.addEventListener('click', (e) => selectComponent(component));
 
   return div;
+}
+
+function toggleComponent(id) {
+  if (collapsedIds.has(id)) {
+    collapsedIds.delete(id);
+  } else {
+    collapsedIds.add(id);
+  }
+  // Re-render full tree with new state
+  if (currentData && currentData.components) {
+    renderComponentTree(currentData.components);
+  }
 }
 
 // Component seçimi
