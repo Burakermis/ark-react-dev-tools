@@ -85,7 +85,7 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 // Tree State
 const collapsedIds = new Set();
 let isFirstRender = true;
-const MAX_INITIAL_DEPTH = 3;
+const MAX_INITIAL_DEPTH = 0;
 
 function buildTree(flatList) {
   const root = { id: 'virtual-root', children: [], depth: -1 };
