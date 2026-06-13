@@ -19,13 +19,45 @@ backgroundPageConnection.onMessage.addListener(function (message) {
   if (!chrome.runtime?.id) return;
 
   if (message.type === 'REACT_DATA') {
-    handleReactData(message.data);
+    if (message.data.action === 'SELECT_COMPONENT') {
+      const comp = currentData.components.find(c => c.id === message.data.id);
+      if (comp) {
+        selectComponent(comp);
+        scrollToComponent(message.data.id);
+      }
+    } else {
+      handleReactData(message.data);
+    }
+  }
+
+  if (message.type === 'PICKING_STOPPED') {
+    isPicking = false;
+    document.getElementById('inspectBtn').classList.remove('active');
   }
 });
 
-// Inspect butonuna tıklama
+function scrollToComponent(id) {
+  // Tree re-render olmuş olabilir, DOM'un güncellenmesini bekle
+  setTimeout(() => {
+    const el = document.querySelector(`.component-item[data-id="${id}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 100);
+}
+
+// Inspect (Select component) modu
+let isPicking = false;
+
 document.getElementById('inspectBtn').addEventListener('click', function () {
-  inspectPage();
+  isPicking = !isPicking;
+  if (isPicking) {
+    document.getElementById('inspectBtn').classList.add('active');
+    safeSendMessage({ type: 'START_PICKING' });
+  } else {
+    document.getElementById('inspectBtn').classList.remove('active');
+    safeSendMessage({ type: 'STOP_PICKING' });
+  }
 });
 
 // Refresh butonuna tıklama
@@ -69,14 +101,11 @@ function handleReactData(data) {
     return;
   }
 
-  // İlk yüklemede üst seviye bileşenleri aç
-  if (isFirstRender && data.components) {
+  // Bileşenleri aç (Yeni gelen bileşenleri de otomatik açmak için depth limitini kaldırdık)
+  if (data.components) {
     data.components.forEach(comp => {
-      if (comp.depth < MAX_INITIAL_DEPTH) {
-        expandedIds.add(comp.id);
-      }
+      expandedIds.add(comp.id);
     });
-    isFirstRender = false;
   }
 
   renderComponentTree(data.components);
@@ -170,6 +199,7 @@ function renderTreeNodes(nodes, container) {
 function createComponentNode(component) {
   const div = document.createElement('div');
   div.className = 'component-item';
+  div.setAttribute('data-id', component.id);
   if (selectedComponent && selectedComponent.id === component.id) {
     div.classList.add('selected');
   }

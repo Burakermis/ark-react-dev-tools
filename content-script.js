@@ -28,6 +28,12 @@
         type: 'INSPECTOR_READY'
       });
     }
+
+    if (event.data.type === 'REACT_INSPECTOR_PICKING_STOPPED') {
+      chrome.runtime.sendMessage({
+        type: 'PICKING_STOPPED'
+      });
+    }
   });
 
   // DevTools'dan gelen istekleri dinle
@@ -36,6 +42,16 @@
       // Sayfaya inspect isteği gönder
       window.postMessage({
         type: 'REACT_INSPECTOR_INSPECT'
+      }, '*');
+      sendResponse({ success: true });
+    } else if (request.type === 'START_PICKING') {
+      window.postMessage({
+        type: 'REACT_INSPECTOR_START_PICKING'
+      }, '*');
+      sendResponse({ success: true });
+    } else if (request.type === 'STOP_PICKING') {
+      window.postMessage({
+        type: 'REACT_INSPECTOR_STOP_PICKING'
       }, '*');
       sendResponse({ success: true });
     } else if (request.type === 'HIGHLIGHT_COMPONENT') {

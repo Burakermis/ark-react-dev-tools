@@ -6,11 +6,15 @@
   console.log('%c[React Inspector - Inject] 🚀 Script yüklendi', 'color: #61dafb; font-weight: bold; font-size: 14px');
 
   // React Fiber tree'yi traverse et
-  function traverseFiber(fiber, depth = 0, parentId = null, index = 0) {
-    if (!fiber) return [];
+  function traverseFiber(fiber, depth = 0, parentId = null, index = 0, targetFiber = null) {
+    if (!fiber) return targetFiber ? null : [];
 
     const components = [];
     const componentId = `${parentId || 'root'}-${index}`;
+
+    if (targetFiber && fiber === targetFiber) {
+      return componentId;
+    }
 
     // Component bilgilerini topla
     if (fiber.type) {
@@ -39,15 +43,18 @@
         let childIndex = 0;
         let child = fiber.child;
         while (child) {
-          const childComponents = traverseFiber(child, depth + 1, componentId, childIndex);
-          components.push(...childComponents);
+          const result = traverseFiber(child, depth + 1, componentId, childIndex, targetFiber);
+          if (targetFiber && result) return result;
+          if (!targetFiber) components.push(...result);
           child = child.sibling;
           childIndex++;
         }
       }
     } else if (fiber.child) {
       // Type yoksa ama child varsa (Fragment gibi)
-      components.push(...traverseFiber(fiber.child, depth, parentId, index));
+      const result = traverseFiber(fiber.child, depth, parentId, index, targetFiber);
+      if (targetFiber && result) return result;
+      if (!targetFiber) components.push(...result);
     }
 
     // Sibling'leri traverse et (aynı seviyede)
@@ -429,6 +436,82 @@
     return 'Unknown';
   }
 
+  // Select component in page (Inspect mode)
+  let isPickingMode = false;
+
+  function startPickingMode() {
+    isPickingMode = true;
+    document.addEventListener('mousemove', handleMouseMove, true);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('mousedown', preventDefault, true);
+    document.addEventListener('mouseup', preventDefault, true);
+  }
+
+  function stopPickingMode() {
+    isPickingMode = false;
+    document.removeEventListener('mousemove', handleMouseMove, true);
+    document.removeEventListener('click', handleClick, true);
+    document.removeEventListener('mousedown', preventDefault, true);
+    document.removeEventListener('mouseup', preventDefault, true);
+    hideHighlight();
+  }
+
+  function preventDefault(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleMouseMove(e) {
+    if (!isPickingMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const target = e.target;
+    const fiber = findFiberByElement(target);
+    if (fiber) {
+      const rect = target.getBoundingClientRect();
+      showHighlight(rect, getComponentName(fiber));
+    }
+  }
+
+  function handleClick(e) {
+    if (!isPickingMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const target = e.target;
+    const fiber = findFiberByElement(target);
+    if (fiber) {
+      const id = getFiberId(fiber);
+      window.postMessage({
+        type: 'REACT_INSPECTOR_RESULT',
+        data: {
+          success: true,
+          action: 'SELECT_COMPONENT',
+          id: id
+        }
+      }, '*');
+    }
+    stopPickingMode();
+    window.postMessage({ type: 'REACT_INSPECTOR_PICKING_STOPPED' }, '*');
+  }
+
+  function findFiberByElement(element) {
+    const keys = Object.keys(element);
+    const fiberKey = keys.find(key => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance'));
+    if (!fiberKey) return null;
+    return element[fiberKey];
+  }
+
+  function getFiberId(fiber) {
+    const roots = findReactRoots();
+    for (let i = 0; i < roots.length; i++) {
+      const id = traverseFiber(roots[i].fiber, 0, `root-${i}`, 0, fiber);
+      if (id) return id;
+    }
+    return null;
+  }
+
   // Highlight overlay
   let highlightOverlay = null;
 
@@ -541,6 +624,10 @@
         type: 'REACT_INSPECTOR_RESULT',
         data: result
       }, '*');
+    } else if (event.data.type === 'REACT_INSPECTOR_START_PICKING') {
+      startPickingMode();
+    } else if (event.data.type === 'REACT_INSPECTOR_STOP_PICKING') {
+      stopPickingMode();
     } else if (event.data.type === 'REACT_INSPECTOR_HIGHLIGHT') {
       const roots = findReactRoots();
       const fiber = findFiberById(roots, event.data.id);
