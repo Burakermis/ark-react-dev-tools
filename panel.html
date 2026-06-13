@@ -12,11 +12,12 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #1e1e1e;
-      color: #d4d4d4;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #20232a;
+      color: #ffffff;
       height: 100vh;
       overflow: hidden;
+      font-size: 12px;
     }
 
     #container {
@@ -25,23 +26,28 @@
     }
 
     #sidebar {
-      width: 350px;
-      background: #252526;
-      border-right: 1px solid #3e3e42;
+      width: 300px;
+      background: #20232a;
+      border-right: 1px solid #373940;
       overflow-y: auto;
       flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     #main {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 0;
+      background: #20232a;
+      display: flex;
+      flex-direction: column;
     }
 
     #header {
-      padding: 15px;
-      background: #2d2d30;
-      border-bottom: 1px solid #3e3e42;
+      padding: 8px 12px;
+      background: #20232a;
+      border-bottom: 1px solid #373940;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -51,46 +57,42 @@
       background: #0e639c;
       color: white;
       border: none;
-      padding: 8px 16px;
+      padding: 6px 12px;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
       transition: background 0.2s;
     }
 
     #searchInput {
-      background: #3e3e42;
-      border: 1px solid #3e3e42;
+      background: #282c34;
+      border: 1px solid #373940;
       color: #d4d4d4;
-      padding: 6px 10px;
+      padding: 4px 8px;
       border-radius: 4px;
       width: 100%;
-      margin-top: 10px;
-      font-size: 13px;
+      margin-top: 6px;
+      font-size: 12px;
     }
 
     #searchInput:focus {
       outline: none;
-      border-color: #0e639c;
+      border-color: #61dafb;
     }
 
     #inspectBtn:hover {
       background: #1177bb;
     }
 
-    #inspectBtn:active {
-      background: #0d5689;
-    }
-
     #refreshBtn {
-      background: #3e3e42;
+      background: #373940;
       color: white;
       border: none;
-      padding: 8px;
+      padding: 6px;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
-      margin-left: 8px;
+      font-size: 13px;
+      margin-left: 6px;
       transition: background 0.2s;
     }
 
@@ -99,58 +101,61 @@
     }
 
     .component-item {
-      padding: 8px 12px;
+      padding: 2px 4px;
       cursor: pointer;
-      border-bottom: 1px solid #3e3e42;
-      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      transition: background 0.1s;
     }
 
     .component-item:hover {
-      background: #2a2d2e;
+      background: #373940;
     }
 
     .component-item.selected {
-      background: #094771;
-      border-left: 3px solid #0e639c;
+      background: #264f78;
     }
 
     .component-name {
-      font-weight: 500;
-      color: #4ec9b0;
+      color: #61dafb;
     }
 
     .component-type {
-      font-size: 12px;
+      font-size: 11px;
       color: #858585;
-      margin-left: 8px;
+      margin-left: 6px;
     }
 
     .section {
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
     .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #569cd6;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #3e3e42;
+      font-size: 11px;
+      font-weight: bold;
+      color: #999;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      margin-top: 16px;
     }
 
     .property {
-      margin-bottom: 8px;
-      font-size: 14px;
+      margin-bottom: 2px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
     }
 
     .property-key {
-      color: #9cdcfe;
-      font-weight: 500;
+      color: #ef596f;
+      font-weight: normal;
     }
 
     .property-value {
-      color: #ce9178;
-      margin-left: 8px;
+      color: #d19a66;
+      margin-left: 6px;
     }
 
     .empty-state {
@@ -159,70 +164,89 @@
       color: #858585;
     }
 
-    .tree-item {
-      padding-left: 20px;
-    }
-
     .tree-children, .property-tree-children {
-      margin-left: 16px;
+      margin-left: 12px;
     }
 
     .tree-toggle {
       cursor: pointer;
       display: inline-block;
-      width: 16px;
-      height: 16px;
-      line-height: 16px;
+      width: 12px;
+      height: 12px;
+      line-height: 12px;
       text-align: center;
       user-select: none;
-      color: #858585;
+      color: #666;
       margin-right: 4px;
-      font-size: 10px;
+      font-size: 9px;
       transition: transform 0.1s;
-    }
-
-    .tree-toggle:hover {
-      color: #d4d4d4;
     }
 
     .tree-toggle.expanded {
       transform: rotate(90deg);
     }
 
-    .property {
-      border-left: 1px solid transparent;
-      transition: border-color 0.2s;
-    }
-
-    .property:hover {
-      border-left: 1px solid #0e639c;
-      background: rgba(14, 99, 156, 0.1);
-    }
-
-    .tree-content {
-      display: none;
-    }
-
-    .tree-content.expanded {
-      display: block;
-    }
-
-    pre {
-      background: #1e1e1e;
-      padding: 12px;
-      border-radius: 4px;
-      overflow-x: auto;
-      font-size: 13px;
-      border: 1px solid #3e3e42;
-    }
-
     .info-badge {
       display: inline-block;
-      padding: 2px 8px;
-      background: #264f78;
-      border-radius: 3px;
-      font-size: 12px;
-      margin-left: 8px;
+      padding: 1px 4px;
+      background: #373940;
+      border-radius: 2px;
+      font-size: 10px;
+      margin-left: 4px;
+      color: #999;
+    }
+
+    .badge-type {
+      background: #444;
+      color: #ccc;
+      padding: 0 3px;
+      border-radius: 2px;
+      font-size: 9px;
+      margin-left: 4px;
+      font-weight: normal;
+    }
+
+    .breadcrumb {
+      padding: 8px 12px;
+      background: #282c34;
+      border-bottom: 1px solid #373940;
+      font-size: 11px;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .breadcrumb-item {
+      color: #ccc;
+    }
+
+    .breadcrumb-separator {
+      color: #666;
+    }
+
+    .breadcrumb-current {
+      color: #61dafb;
+      font-weight: bold;
+    }
+
+    .hook-item {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 4px;
+    }
+
+    .hook-index {
+      color: #777;
+      margin-right: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      width: 15px;
+      text-align: right;
+    }
+
+    #details {
+      padding: 12px;
     }
 
     .loading {
@@ -232,13 +256,13 @@
     }
 
     #stats {
-      font-size: 12px;
+      font-size: 11px;
       color: #858585;
     }
 
     #resizer {
-      width: 5px;
-      background: #3e3e42;
+      width: 4px;
+      background: #373940;
       cursor: col-resize;
       transition: background 0.2s;
       flex-shrink: 0;
@@ -246,10 +270,9 @@
 
     #resizer:hover,
     #resizer.resizing {
-      background: #0e639c;
+      background: #61dafb;
     }
 
-    /* Prevent text selection while resizing */
     body.resizing {
       user-select: none;
       cursor: col-resize;
@@ -261,14 +284,14 @@
   <div id="container">
     <div id="sidebar">
       <div id="header">
-        <div style="flex: 1; margin-right: 10px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <strong>Components</strong>
+        <div style="flex: 1; margin-right: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong>ARK React DevTools</strong>
             <span id="stats"></span>
           </div>
-          <input type="text" id="searchInput" placeholder="Filter components...">
+          <input type="text" id="searchInput" placeholder="Search (text or /regex/)">
         </div>
-        <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 4px;">
           <button id="inspectBtn" title="Inspect Page">🔍</button>
           <button id="refreshBtn" title="Refresh Tree">🔄</button>
         </div>
@@ -277,6 +300,7 @@
     </div>
     <div id="resizer"></div>
     <div id="main">
+      <div id="details-header"></div>
       <div id="details"></div>
     </div>
   </div>

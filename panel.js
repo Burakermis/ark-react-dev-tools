@@ -146,19 +146,7 @@ function createComponentNode(component) {
     div.classList.add('selected');
   }
 
-  // Padding based on depth (reset depth since we use nested divs? No, we use flat structure visually but logic is nested)
-  // Wait, if we use nested divs for children (tree-children), we don't need cumulative padding on items!
-  // The padding happens naturally via hierarchy?
-  // Let's check CSS. .tree-children usually has padding-left.
-  // But our CSS doesn't have .tree-children padding yet.
-
-  // Let's use explicit padding and flat visual structure but nested in DOM for standard tree feel.
-  // Actually, standard tree implementation usually shifts children right.
-  // So:
-  // .tree-children { padding-left: 12px; }
-  // And remove variable padding from createComponentNode.
-
-  div.style.paddingLeft = '4px'; // Base padding
+  div.style.paddingLeft = '4px';
 
   // Toggle Icon
   const toggle = document.createElement('span');
@@ -174,27 +162,35 @@ function createComponentNode(component) {
       toggleComponent(component.id);
     });
   } else {
-    toggle.style.opacity = '0';
+    toggle.style.visibility = 'hidden';
     toggle.textContent = '▶';
-    toggle.style.cursor = 'default';
   }
   div.appendChild(toggle);
 
   const name = document.createElement('span');
   name.className = 'component-name';
   name.textContent = component.name;
+  div.appendChild(name);
 
-  const type = document.createElement('span');
-  type.className = 'component-type';
   if (component.key) {
-    type.textContent = ` key="${component.key}"`;
-    type.style.color = '#9cdcfe';
-  } else {
-    type.textContent = '';
+    const keyBadge = document.createElement('span');
+    keyBadge.className = 'badge-type';
+    keyBadge.style.color = '#9cdcfe';
+    keyBadge.textContent = `key="${component.key}"`;
+    div.appendChild(keyBadge);
   }
 
-  div.appendChild(name);
-  div.appendChild(type);
+  if (component.name.includes('Memo')) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-type';
+    badge.textContent = 'Memo';
+    div.appendChild(badge);
+  } else if (component.name.includes('ForwardRef')) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-type';
+    badge.textContent = 'ForwardRef';
+    div.appendChild(badge);
+  }
 
   div.addEventListener('click', (e) => selectComponent(component));
 
@@ -238,66 +234,105 @@ function selectComponent(component) {
 
 // Component detaylarını render et
 function renderComponentDetails(component) {
+  renderBreadcrumbs(component);
   const details = document.getElementById('details');
   details.innerHTML = '';
 
-  // Başlık
-  const title = document.createElement('h2');
-  title.textContent = component.name;
-  title.style.marginBottom = '24px';
-  title.style.color = '#4ec9b0';
-  details.appendChild(title);
-
   // Props
   if (component.props && Object.keys(component.props).length > 0) {
-    const propsSection = createSection('Props', component.props);
+    const propsSection = createSection('props', component.props);
     details.appendChild(propsSection);
   }
 
-  // State
-  if (component.state !== null && component.state !== undefined) {
-    if (component.state._isHooks) {
-      component.state.hooks.forEach((hookValue, index) => {
-        const hookSection = createSection(`Hook ${index}`, hookValue);
-        details.appendChild(hookSection);
-      });
-    } else {
-      const stateSection = createSection('State', component.state);
-      details.appendChild(stateSection);
-    }
+  // Hooks
+  if (component.state !== null && component.state !== undefined && component.state._isHooks) {
+    const hooksContainer = document.createElement('div');
+    hooksContainer.className = 'section';
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.textContent = 'hooks';
+    hooksContainer.appendChild(title);
+
+    component.state.hooks.forEach((hook, index) => {
+      const hookItem = document.createElement('div');
+      hookItem.className = 'hook-item';
+      hookItem.style.display = 'flex';
+      hookItem.style.marginBottom = '8px';
+
+      const idx = document.createElement('span');
+      idx.className = 'hook-index';
+      idx.textContent = index + 1;
+      hookItem.appendChild(idx);
+
+      const valContainer = document.createElement('div');
+      valContainer.style.flex = '1';
+
+      if (typeof hook.value === 'object' && hook.value !== null) {
+        renderObjectTree(hook.value, valContainer);
+      } else {
+        const valSpan = document.createElement('span');
+        valSpan.className = 'property-value';
+        valSpan.style.marginLeft = '0';
+        valSpan.textContent = formatValue(hook.value);
+        valContainer.appendChild(valSpan);
+      }
+
+      hookItem.appendChild(valContainer);
+      hooksContainer.appendChild(hookItem);
+    });
+    details.appendChild(hooksContainer);
+  } else if (component.state !== null && component.state !== undefined) {
+    const stateSection = createSection('state', component.state);
+    details.appendChild(stateSection);
   }
 
-  // Context
-  if (component.context && Object.keys(component.context).length > 0) {
-    const contextSection = createSection('Context', component.context);
-    details.appendChild(contextSection);
-  }
-
-  // Component bilgileri
-  const infoSection = document.createElement('div');
-  infoSection.className = 'section';
-  infoSection.innerHTML = `
-    <div class="section-title">Component Info</div>
+  // Rendered by
+  const renderedBySection = document.createElement('div');
+  renderedBySection.className = 'section';
+  renderedBySection.innerHTML = `
+    <div class="section-title">rendered by</div>
     <div class="property">
-      <span class="property-key">Type:</span>
-      <span class="property-value">${component.type}</span>
-    </div>
-    <div class="property">
-      <span class="property-key">Key:</span>
-      <span class="property-value">${component.key || 'null'}</span>
-    </div>
-    <div class="property">
-      <span class="property-key">Depth:</span>
-      <span class="property-value">${component.depth}</span>
+      <span class="property-value" style="color: #61dafb; margin-left: 0;">react-dom@${currentData.reactVersion}</span>
     </div>
   `;
-  details.appendChild(infoSection);
+  details.appendChild(renderedBySection);
 
-  // Redux (eğer varsa)
-  if (currentData.redux && currentData.redux.found) {
-    const reduxSection = createSection('Redux Store', currentData.redux.state);
-    details.appendChild(reduxSection);
+  // Source
+  if (component.source) {
+    const sourceSection = document.createElement('div');
+    sourceSection.className = 'section';
+    const fileName = component.source.fileName.split('/').pop();
+    sourceSection.innerHTML = `
+      <div class="section-title">source</div>
+      <div class="property">
+        <span class="property-value" style="color: #61dafb; cursor: pointer; margin-left: 0; text-decoration: underline;">
+          ${fileName}:${component.source.lineNumber}
+        </span>
+      </div>
+    `;
+    details.appendChild(sourceSection);
   }
+}
+
+function renderBreadcrumbs(component) {
+  const header = document.getElementById('details-header');
+  header.innerHTML = '';
+
+  const bc = document.createElement('div');
+  bc.className = 'breadcrumb';
+
+  const idBadge = document.createElement('span');
+  idBadge.className = 'breadcrumb-item';
+  // Use component index or similar to have a "stable-ish" mock ID
+  idBadge.textContent = component.id.split('-').pop().padStart(8, '0');
+  bc.appendChild(idBadge);
+
+  const name = document.createElement('span');
+  name.className = 'breadcrumb-current';
+  name.textContent = component.name;
+  bc.appendChild(name);
+
+  header.appendChild(bc);
 }
 
 // Section oluştur
@@ -364,7 +399,7 @@ function renderObjectTree(obj, container, depth = 0) {
 
         const valuePreview = document.createElement('span');
         valuePreview.className = 'property-value';
-        valuePreview.textContent = Array.isArray(value) ? `Array(${value.length})` : 'Object';
+        valuePreview.textContent = Array.isArray(value) ? `Array(${value.length})` : '{…}';
         propertyEl.appendChild(valuePreview);
 
         const childrenContainer = document.createElement('div');

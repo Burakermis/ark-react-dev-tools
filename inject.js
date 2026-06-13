@@ -24,6 +24,10 @@
         depth: depth,
         key: fiber.key,
         index: index,
+        source: fiber._debugSource ? {
+          fileName: fiber._debugSource.fileName,
+          lineNumber: fiber._debugSource.lineNumber
+        } : null,
         children: []
       };
 
@@ -126,8 +130,13 @@
       const hooks = [];
       let currentHook = fiber.memoizedState;
 
+      // React internally uses different tags for hooks
+      // But we can try to guess or at least show them
       while (currentHook && currentHook.hasOwnProperty('memoizedState')) {
-        hooks.push(safeSerialize(currentHook.memoizedState));
+        hooks.push({
+          value: safeSerialize(currentHook.memoizedState),
+          queue: currentHook.queue ? true : false
+        });
         currentHook = currentHook.next;
       }
 
