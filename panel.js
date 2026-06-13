@@ -52,10 +52,20 @@ function handleReactData(data) {
     return;
   }
 
+  // İlk yüklemede derin bileşenleri kapat
+  if (isFirstRender && data.components) {
+    data.components.forEach(comp => {
+      if (comp.depth >= MAX_INITIAL_DEPTH) {
+        collapsedIds.add(comp.id);
+      }
+    });
+    isFirstRender = false;
+  }
+
   renderComponentTree(data.components);
   renderStats(data);
 
-  if (data.components.length > 0) {
+  if (data.components.length > 0 && !selectedComponent) {
     selectComponent(data.components[0]);
   }
 }
@@ -74,7 +84,8 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 // Component tree'yi render et
 // Tree State
 const collapsedIds = new Set();
-// Varsayılan olarak her şey açık (collapsedIds boş)
+let isFirstRender = true;
+const MAX_INITIAL_DEPTH = 3;
 
 function buildTree(flatList) {
   const root = { id: 'virtual-root', children: [], depth: -1 };
