@@ -48,7 +48,6 @@
         type: 'REACT_INSPECTOR_HIDE_HIGHLIGHT'
       }, '*');
     }
-    return true;
   });
 
 })();

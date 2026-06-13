@@ -35,5 +35,4 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       connections[tabId].postMessage(request);
     }
   }
-  return true;
 });
