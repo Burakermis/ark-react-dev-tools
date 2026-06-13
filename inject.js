@@ -28,6 +28,7 @@
           fileName: fiber._debugSource.fileName,
           lineNumber: fiber._debugSource.lineNumber
         } : null,
+        renderedBy: fiber._debugOwner ? getComponentName(fiber._debugOwner) : (fiber.return ? getComponentName(fiber.return) : null),
         children: []
       };
 

@@ -289,12 +289,40 @@ function renderComponentDetails(component) {
   // Rendered by
   const renderedBySection = document.createElement('div');
   renderedBySection.className = 'section';
-  renderedBySection.innerHTML = `
-    <div class="section-title">rendered by</div>
-    <div class="property">
-      <span class="property-value" style="color: #61dafb; margin-left: 0;">react-dom@${currentData.reactVersion}</span>
-    </div>
-  `;
+
+  const rbTitle = document.createElement('div');
+  rbTitle.className = 'section-title';
+  rbTitle.textContent = 'rendered by';
+  renderedBySection.appendChild(rbTitle);
+
+  const rbProperty = document.createElement('div');
+  rbProperty.className = 'property';
+
+  if (component.renderedBy && component.renderedBy !== 'Unknown' && component.renderedBy !== 'Anonymous') {
+    const parentSpan = document.createElement('span');
+    parentSpan.className = 'property-value';
+    parentSpan.style.color = '#61dafb';
+    parentSpan.style.marginLeft = '0';
+    parentSpan.style.cursor = 'pointer';
+    parentSpan.style.textDecoration = 'underline';
+    parentSpan.textContent = component.renderedBy;
+    rbProperty.appendChild(parentSpan);
+
+    const separator = document.createElement('span');
+    separator.textContent = ' in ';
+    separator.style.color = '#999';
+    separator.style.margin = '0 4px';
+    rbProperty.appendChild(separator);
+  }
+
+  const versionSpan = document.createElement('span');
+  versionSpan.className = 'property-value';
+  versionSpan.style.color = '#999';
+  versionSpan.style.marginLeft = '0';
+  versionSpan.textContent = `react-dom@${currentData.reactVersion}`;
+  rbProperty.appendChild(versionSpan);
+
+  renderedBySection.appendChild(rbProperty);
   details.appendChild(renderedBySection);
 
   // Source
