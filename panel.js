@@ -52,6 +52,15 @@ function handleReactData(data) {
     return;
   }
 
+  // İlk yüklemede üst seviye bileşenleri aç
+  if (isFirstRender && data.components) {
+    data.components.forEach(comp => {
+      if (comp.depth < MAX_INITIAL_DEPTH) {
+        expandedIds.add(comp.id);
+      }
+    });
+    isFirstRender = false;
+  }
 
   renderComponentTree(data.components);
   renderStats(data);
@@ -75,6 +84,8 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 // Component tree'yi render et
 // Tree State
 const expandedIds = new Set();
+let isFirstRender = true;
+const MAX_INITIAL_DEPTH = 3;
 
 function buildTree(flatList) {
   const root = { id: 'virtual-root', children: [], depth: -1 };
