@@ -82,6 +82,22 @@
       background: #0d5689;
     }
 
+    #refreshBtn {
+      background: #3e3e42;
+      color: white;
+      border: none;
+      padding: 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-left: 8px;
+      transition: background 0.2s;
+    }
+
+    #refreshBtn:hover {
+      background: #4e4e52;
+    }
+
     .component-item {
       padding: 8px 12px;
       cursor: pointer;
@@ -147,7 +163,7 @@
       padding-left: 20px;
     }
 
-    .tree-children {
+    .tree-children, .property-tree-children {
       margin-left: 16px;
     }
 
@@ -171,6 +187,16 @@
 
     .tree-toggle.expanded {
       transform: rotate(90deg);
+    }
+
+    .property {
+      border-left: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+
+    .property:hover {
+      border-left: 1px solid #0e639c;
+      background: rgba(14, 99, 156, 0.1);
     }
 
     .tree-content {
@@ -242,7 +268,10 @@
           </div>
           <input type="text" id="searchInput" placeholder="Filter components...">
         </div>
-        <button id="inspectBtn">🔍</button>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button id="inspectBtn" title="Inspect Page">🔍</button>
+          <button id="refreshBtn" title="Refresh Tree">🔄</button>
+        </div>
       </div>
       <div id="componentTree"></div>
     </div>

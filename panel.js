@@ -2,6 +2,7 @@
 
 let currentData = null;
 let selectedComponent = null;
+const tabId = chrome.devtools.inspectedWindow.tabId;
 
 // Background script ile bağlantı kur
 const backgroundPageConnection = chrome.runtime.connect({
@@ -25,15 +26,15 @@ document.getElementById('inspectBtn').addEventListener('click', function () {
   inspectPage();
 });
 
+// Refresh butonuna tıklama
+document.getElementById('refreshBtn').addEventListener('click', function () {
+  inspectPage();
+});
+
 // Sayfayı inspect et
 function inspectPage() {
   showLoading();
-
-  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    if (tabs[0]) {
-      chrome.tabs.sendMessage(tabs[0].id, { type: 'INSPECT_PAGE' });
-    }
-  });
+  chrome.tabs.sendMessage(tabId, { type: 'INSPECT_PAGE' });
 }
 
 function showLoading() {
@@ -197,6 +198,14 @@ function createComponentNode(component) {
 
   div.addEventListener('click', (e) => selectComponent(component));
 
+  div.addEventListener('mouseenter', () => {
+    chrome.tabs.sendMessage(tabId, { type: 'HIGHLIGHT_COMPONENT', id: component.id });
+  });
+
+  div.addEventListener('mouseleave', () => {
+    chrome.tabs.sendMessage(tabId, { type: 'HIDE_HIGHLIGHT' });
+  });
+
   return div;
 }
 
@@ -247,8 +256,15 @@ function renderComponentDetails(component) {
 
   // State
   if (component.state !== null && component.state !== undefined) {
-    const stateSection = createSection('State', component.state);
-    details.appendChild(stateSection);
+    if (component.state._isHooks) {
+      component.state.hooks.forEach((hookValue, index) => {
+        const hookSection = createSection(`Hook ${index}`, hookValue);
+        details.appendChild(hookSection);
+      });
+    } else {
+      const stateSection = createSection('State', component.state);
+      details.appendChild(stateSection);
+    }
   }
 
   // Context
@@ -294,11 +310,92 @@ function createSection(title, data) {
   titleEl.textContent = title;
   section.appendChild(titleEl);
 
-  const content = document.createElement('pre');
-  content.textContent = JSON.stringify(data, null, 2);
+  const content = document.createElement('div');
+  content.className = 'property-tree';
+
+  if (typeof data === 'object' && data !== null) {
+    renderObjectTree(data, content);
+  } else {
+    const simpleValue = document.createElement('div');
+    simpleValue.className = 'property';
+    const valSpan = document.createElement('span');
+    valSpan.className = 'property-value';
+    valSpan.textContent = formatValue(data);
+    simpleValue.appendChild(valSpan);
+    content.appendChild(simpleValue);
+  }
+
   section.appendChild(content);
 
   return section;
+}
+
+function formatValue(value) {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'string') return `"${value}"`;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return `Array(${value.length})`;
+  if (typeof value === 'object') return 'Object';
+  return String(value);
+}
+
+function renderObjectTree(obj, container, depth = 0) {
+  for (const key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+
+    const value = obj[key];
+    const isObject = typeof value === 'object' && value !== null;
+    const propertyEl = document.createElement('div');
+    propertyEl.className = 'property';
+
+    const keySpan = document.createElement('span');
+    keySpan.className = 'property-key';
+    keySpan.textContent = `${key}: `;
+    propertyEl.appendChild(keySpan);
+
+    if (isObject) {
+      const hasChildren = Object.keys(value).length > 0;
+      if (hasChildren) {
+        const toggle = document.createElement('span');
+        toggle.className = 'tree-toggle';
+        toggle.textContent = '▶';
+        propertyEl.insertBefore(toggle, keySpan);
+
+        const valuePreview = document.createElement('span');
+        valuePreview.className = 'property-value';
+        valuePreview.textContent = Array.isArray(value) ? `Array(${value.length})` : 'Object';
+        propertyEl.appendChild(valuePreview);
+
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'property-tree-children';
+        childrenContainer.style.display = 'none';
+
+        toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isExpanded = childrenContainer.style.display === 'block';
+          childrenContainer.style.display = isExpanded ? 'none' : 'block';
+          toggle.classList.toggle('expanded', !isExpanded);
+        });
+
+        renderObjectTree(value, childrenContainer, depth + 1);
+        container.appendChild(propertyEl);
+        container.appendChild(childrenContainer);
+      } else {
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'property-value';
+        valueSpan.textContent = Array.isArray(value) ? '[]' : '{}';
+        propertyEl.appendChild(valueSpan);
+        container.appendChild(propertyEl);
+      }
+    } else {
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'property-value';
+      valueSpan.textContent = formatValue(value);
+      propertyEl.appendChild(valueSpan);
+      container.appendChild(propertyEl);
+    }
+  }
 }
 
 // İstatistikleri göster
