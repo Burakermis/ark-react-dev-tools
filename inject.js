@@ -6,11 +6,15 @@
   console.log('%c[React Inspector - Inject] 🚀 Script yüklendi', 'color: #61dafb; font-weight: bold; font-size: 14px');
 
   // React Fiber tree'yi traverse et
-  function traverseFiber(fiber, depth = 0, parentId = null, index = 0) {
-    if (!fiber) return [];
+  function traverseFiber(fiber, depth = 0, parentId = null, index = 0, targetFiber = null) {
+    if (!fiber) return targetFiber ? null : [];
 
     const components = [];
     const componentId = `${parentId || 'root'}-${index}`;
+
+    if (targetFiber && fiber === targetFiber) {
+      return componentId;
+    }
 
     // Component bilgilerini topla
     if (fiber.type) {
@@ -19,10 +23,16 @@
         name: getComponentName(fiber),
         type: getComponentType(fiber),
         props: safeSerialize(fiber.memoizedProps),
-        state: safeSerialize(fiber.memoizedState),
+        state: getComponentState(fiber),
         context: safeSerialize(fiber.context),
         depth: depth,
         key: fiber.key,
+        index: index,
+        source: fiber._debugSource ? {
+          fileName: fiber._debugSource.fileName,
+          lineNumber: fiber._debugSource.lineNumber
+        } : null,
+        renderedBy: fiber._debugOwner ? getComponentName(fiber._debugOwner) : (fiber.return ? getComponentName(fiber.return) : null),
         children: []
       };
 
@@ -33,15 +43,18 @@
         let childIndex = 0;
         let child = fiber.child;
         while (child) {
-          const childComponents = traverseFiber(child, depth + 1, componentId, childIndex);
-          components.push(...childComponents);
+          const result = traverseFiber(child, depth + 1, componentId, childIndex, targetFiber);
+          if (targetFiber && result) return result;
+          if (!targetFiber) components.push(...result);
           child = child.sibling;
           childIndex++;
         }
       }
     } else if (fiber.child) {
       // Type yoksa ama child varsa (Fragment gibi)
-      components.push(...traverseFiber(fiber.child, depth, parentId, index));
+      const result = traverseFiber(fiber.child, depth, parentId, index, targetFiber);
+      if (targetFiber && result) return result;
+      if (!targetFiber) components.push(...result);
     }
 
     // Sibling'leri traverse et (aynı seviyede)
@@ -114,6 +127,36 @@
     if (typeof fiber.type === 'string') return 'native';
     if (fiber.type.prototype && fiber.type.prototype.isReactComponent) return 'class';
     return 'function';
+  }
+
+  // State ve Hooks bilgilerini al
+  function getComponentState(fiber) {
+    if (!fiber.memoizedState) return null;
+
+    // Hook bazlı state kontrolü
+    if (typeof fiber.type === 'function') {
+      const hooks = [];
+      let currentHook = fiber.memoizedState;
+
+      // React internally uses different tags for hooks
+      // But we can try to guess or at least show them
+      while (currentHook && currentHook.hasOwnProperty('memoizedState')) {
+        hooks.push({
+          value: safeSerialize(currentHook.memoizedState),
+          queue: currentHook.queue ? true : false
+        });
+        currentHook = currentHook.next;
+      }
+
+      if (hooks.length > 0) {
+        return {
+          _isHooks: true,
+          hooks: hooks
+        };
+      }
+    }
+
+    return safeSerialize(fiber.memoizedState);
   }
 
   // Objeleri güvenli şekilde serialize et
@@ -393,6 +436,182 @@
     return 'Unknown';
   }
 
+  // Select component in page (Inspect mode)
+  let isPickingMode = false;
+
+  function startPickingMode() {
+    isPickingMode = true;
+    document.addEventListener('mousemove', handleMouseMove, true);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('mousedown', preventDefault, true);
+    document.addEventListener('mouseup', preventDefault, true);
+  }
+
+  function stopPickingMode() {
+    isPickingMode = false;
+    document.removeEventListener('mousemove', handleMouseMove, true);
+    document.removeEventListener('click', handleClick, true);
+    document.removeEventListener('mousedown', preventDefault, true);
+    document.removeEventListener('mouseup', preventDefault, true);
+    hideHighlight();
+  }
+
+  function preventDefault(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleMouseMove(e) {
+    if (!isPickingMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const target = e.target;
+    const fiber = findFiberByElement(target);
+    if (fiber) {
+      const rect = target.getBoundingClientRect();
+      showHighlight(rect, getComponentName(fiber));
+    }
+  }
+
+  function handleClick(e) {
+    if (!isPickingMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const target = e.target;
+    const fiber = findFiberByElement(target);
+    if (fiber) {
+      const id = getFiberId(fiber);
+      window.postMessage({
+        type: 'REACT_INSPECTOR_RESULT',
+        data: {
+          success: true,
+          action: 'SELECT_COMPONENT',
+          id: id
+        }
+      }, '*');
+    }
+    stopPickingMode();
+    window.postMessage({ type: 'REACT_INSPECTOR_PICKING_STOPPED' }, '*');
+  }
+
+  function findFiberByElement(element) {
+    const keys = Object.keys(element);
+    const fiberKey = keys.find(key => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance'));
+    if (!fiberKey) return null;
+    return element[fiberKey];
+  }
+
+  function getFiberId(fiber) {
+    const roots = findReactRoots();
+    for (let i = 0; i < roots.length; i++) {
+      const id = traverseFiber(roots[i].fiber, 0, `root-${i}`, 0, fiber);
+      if (id) return id;
+    }
+    return null;
+  }
+
+  // Highlight overlay
+  let highlightOverlay = null;
+
+  function showHighlight(rect, name) {
+    if (!highlightOverlay) {
+      highlightOverlay = document.createElement('div');
+      highlightOverlay.id = 'react-inspector-highlight';
+      highlightOverlay.style.cssText = `
+        position: fixed;
+        z-index: 10000000;
+        background: rgba(135, 206, 235, 0.5);
+        border: 1px solid #0078d4;
+        pointer-events: none;
+        transition: all 0.1s ease;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+      `;
+      const label = document.createElement('div');
+      label.id = 'react-inspector-label';
+      label.style.cssText = `
+        background: #0078d4;
+        color: white;
+        padding: 2px 6px;
+        font-size: 12px;
+        border-radius: 2px;
+        margin-top: -24px;
+        white-space: nowrap;
+      `;
+      highlightOverlay.appendChild(label);
+      document.body.appendChild(highlightOverlay);
+    }
+
+    highlightOverlay.style.display = 'flex';
+    highlightOverlay.style.left = rect.left + 'px';
+    highlightOverlay.style.top = rect.top + 'px';
+    highlightOverlay.style.width = rect.width + 'px';
+    highlightOverlay.style.height = rect.height + 'px';
+
+    const label = highlightOverlay.querySelector('#react-inspector-label');
+    label.textContent = name;
+
+    // Position label inside if component is at the very top
+    if (rect.top < 30) {
+      label.style.marginTop = '0';
+    } else {
+      label.style.marginTop = '-24px';
+    }
+  }
+
+  function hideHighlight() {
+    if (highlightOverlay) {
+      highlightOverlay.style.display = 'none';
+    }
+  }
+
+  function findFiberById(roots, id) {
+    const parts = id.split('-');
+    const rootIdx = parseInt(parts[1]);
+    if (isNaN(rootIdx) || !roots[rootIdx]) return null;
+
+    let current = roots[rootIdx].fiber;
+
+    // ID path: root-0-1-0 etc.
+    for (let i = 2; i < parts.length; i++) {
+      const targetIdx = parseInt(parts[i]);
+      let child = current.child;
+      let currentIdx = 0;
+
+      while (child && currentIdx < targetIdx) {
+        child = child.sibling;
+        currentIdx++;
+      }
+
+      if (!child) return null;
+      current = child;
+    }
+
+    return current;
+  }
+
+  function getElementForFiber(fiber) {
+    if (!fiber) return null;
+
+    // Eğer native bir component ise direkt stateNode'u al
+    if (fiber.stateNode instanceof HTMLElement) {
+      return fiber.stateNode;
+    }
+
+    // Değilse child'lara bak (ilk bulunan DOM elementini al)
+    let child = fiber.child;
+    while (child) {
+      const el = getElementForFiber(child);
+      if (el) return el;
+      child = child.sibling;
+    }
+
+    return null;
+  }
+
   // Message listener
   window.addEventListener('message', function (event) {
     if (event.source !== window) return;
@@ -405,6 +624,21 @@
         type: 'REACT_INSPECTOR_RESULT',
         data: result
       }, '*');
+    } else if (event.data.type === 'REACT_INSPECTOR_START_PICKING') {
+      startPickingMode();
+    } else if (event.data.type === 'REACT_INSPECTOR_STOP_PICKING') {
+      stopPickingMode();
+    } else if (event.data.type === 'REACT_INSPECTOR_HIGHLIGHT') {
+      const roots = findReactRoots();
+      const fiber = findFiberById(roots, event.data.id);
+      const element = getElementForFiber(fiber);
+
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        showHighlight(rect, getComponentName(fiber));
+      }
+    } else if (event.data.type === 'REACT_INSPECTOR_HIDE_HIGHLIGHT') {
+      hideHighlight();
     }
   });
 

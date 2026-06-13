@@ -2,6 +2,7 @@
 
 let currentData = null;
 let selectedComponent = null;
+const tabId = chrome.devtools.inspectedWindow.tabId;
 
 // Background script ile bağlantı kur
 const backgroundPageConnection = chrome.runtime.connect({
@@ -15,25 +16,74 @@ backgroundPageConnection.postMessage({
 
 // Background'dan gelen mesajları dinle
 backgroundPageConnection.onMessage.addListener(function (message) {
+  if (!chrome.runtime?.id) return;
+
   if (message.type === 'REACT_DATA') {
-    handleReactData(message.data);
+    if (message.data.action === 'SELECT_COMPONENT') {
+      const comp = currentData.components.find(c => c.id === message.data.id);
+      if (comp) {
+        selectComponent(comp);
+        scrollToComponent(message.data.id);
+      }
+    } else {
+      handleReactData(message.data);
+    }
+  }
+
+  if (message.type === 'PICKING_STOPPED') {
+    isPicking = false;
+    document.getElementById('inspectBtn').classList.remove('active');
   }
 });
 
-// Inspect butonuna tıklama
+function scrollToComponent(id) {
+  // Tree re-render olmuş olabilir, DOM'un güncellenmesini bekle
+  setTimeout(() => {
+    const el = document.querySelector(`.component-item[data-id="${id}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, 100);
+}
+
+// Inspect (Select component) modu
+let isPicking = false;
+
 document.getElementById('inspectBtn').addEventListener('click', function () {
+  isPicking = !isPicking;
+  if (isPicking) {
+    document.getElementById('inspectBtn').classList.add('active');
+    safeSendMessage({ type: 'START_PICKING' });
+  } else {
+    document.getElementById('inspectBtn').classList.remove('active');
+    safeSendMessage({ type: 'STOP_PICKING' });
+  }
+});
+
+// Refresh butonuna tıklama
+document.getElementById('refreshBtn').addEventListener('click', function () {
   inspectPage();
 });
 
 // Sayfayı inspect et
 function inspectPage() {
   showLoading();
+  safeSendMessage({ type: 'INSPECT_PAGE' });
+}
 
-  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    if (tabs[0]) {
-      chrome.tabs.sendMessage(tabs[0].id, { type: 'INSPECT_PAGE' });
+// Güvenli mesajlaşma yardımcısı
+function safeSendMessage(message) {
+  try {
+    if (chrome.runtime?.id) {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('Messaging error:', chrome.runtime.lastError.message);
+        }
+      });
     }
-  });
+  } catch (e) {
+    console.error('Failed to send message:', e);
+  }
 }
 
 function showLoading() {
@@ -51,10 +101,17 @@ function handleReactData(data) {
     return;
   }
 
+  // Bileşenleri aç (Yeni gelen bileşenleri de otomatik açmak için depth limitini kaldırdık)
+  if (data.components) {
+    data.components.forEach(comp => {
+      expandedIds.add(comp.id);
+    });
+  }
+
   renderComponentTree(data.components);
   renderStats(data);
 
-  if (data.components.length > 0) {
+  if (data.components.length > 0 && !selectedComponent) {
     selectComponent(data.components[0]);
   }
 }
@@ -72,8 +129,9 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 
 // Component tree'yi render et
 // Tree State
-const collapsedIds = new Set();
-// Varsayılan olarak her şey açık (collapsedIds boş)
+const expandedIds = new Set();
+let isFirstRender = true;
+const MAX_INITIAL_DEPTH = 3;
 
 function buildTree(flatList) {
   const root = { id: 'virtual-root', children: [], depth: -1 };
@@ -130,7 +188,7 @@ function renderTreeNodes(nodes, container) {
     if (node.children && node.children.length > 0) {
       const childrenContainer = document.createElement('div');
       childrenContainer.className = 'tree-children';
-      childrenContainer.style.display = collapsedIds.has(node.id) ? 'none' : 'block';
+      childrenContainer.style.display = expandedIds.has(node.id) ? 'block' : 'none';
 
       renderTreeNodes(node.children, childrenContainer);
       container.appendChild(childrenContainer);
@@ -141,30 +199,19 @@ function renderTreeNodes(nodes, container) {
 function createComponentNode(component) {
   const div = document.createElement('div');
   div.className = 'component-item';
+  div.setAttribute('data-id', component.id);
   if (selectedComponent && selectedComponent.id === component.id) {
     div.classList.add('selected');
   }
 
-  // Padding based on depth (reset depth since we use nested divs? No, we use flat structure visually but logic is nested)
-  // Wait, if we use nested divs for children (tree-children), we don't need cumulative padding on items!
-  // The padding happens naturally via hierarchy?
-  // Let's check CSS. .tree-children usually has padding-left.
-  // But our CSS doesn't have .tree-children padding yet.
-
-  // Let's use explicit padding and flat visual structure but nested in DOM for standard tree feel.
-  // Actually, standard tree implementation usually shifts children right.
-  // So:
-  // .tree-children { padding-left: 12px; }
-  // And remove variable padding from createComponentNode.
-
-  div.style.paddingLeft = '4px'; // Base padding
+  div.style.paddingLeft = '4px';
 
   // Toggle Icon
   const toggle = document.createElement('span');
   toggle.className = 'tree-toggle';
   if (component.children && component.children.length > 0) {
     toggle.textContent = '▶';
-    if (!collapsedIds.has(component.id)) {
+    if (expandedIds.has(component.id)) {
       toggle.classList.add('expanded');
     }
 
@@ -173,38 +220,54 @@ function createComponentNode(component) {
       toggleComponent(component.id);
     });
   } else {
-    toggle.style.opacity = '0';
+    toggle.style.visibility = 'hidden';
     toggle.textContent = '▶';
-    toggle.style.cursor = 'default';
   }
   div.appendChild(toggle);
 
   const name = document.createElement('span');
   name.className = 'component-name';
   name.textContent = component.name;
+  div.appendChild(name);
 
-  const type = document.createElement('span');
-  type.className = 'component-type';
   if (component.key) {
-    type.textContent = ` key="${component.key}"`;
-    type.style.color = '#9cdcfe';
-  } else {
-    type.textContent = '';
+    const keyBadge = document.createElement('span');
+    keyBadge.className = 'badge-type';
+    keyBadge.style.color = '#9cdcfe';
+    keyBadge.textContent = `key="${component.key}"`;
+    div.appendChild(keyBadge);
   }
 
-  div.appendChild(name);
-  div.appendChild(type);
+  if (component.name.includes('Memo')) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-type';
+    badge.textContent = 'Memo';
+    div.appendChild(badge);
+  } else if (component.name.includes('ForwardRef')) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-type';
+    badge.textContent = 'ForwardRef';
+    div.appendChild(badge);
+  }
 
   div.addEventListener('click', (e) => selectComponent(component));
+
+  div.addEventListener('mouseenter', () => {
+    safeSendMessage({ type: 'HIGHLIGHT_COMPONENT', id: component.id });
+  });
+
+  div.addEventListener('mouseleave', () => {
+    safeSendMessage({ type: 'HIDE_HIGHLIGHT' });
+  });
 
   return div;
 }
 
 function toggleComponent(id) {
-  if (collapsedIds.has(id)) {
-    collapsedIds.delete(id);
+  if (expandedIds.has(id)) {
+    expandedIds.delete(id);
   } else {
-    collapsedIds.add(id);
+    expandedIds.add(id);
   }
   // Re-render full tree with new state
   if (currentData && currentData.components) {
@@ -229,59 +292,133 @@ function selectComponent(component) {
 
 // Component detaylarını render et
 function renderComponentDetails(component) {
+  renderBreadcrumbs(component);
   const details = document.getElementById('details');
   details.innerHTML = '';
 
-  // Başlık
-  const title = document.createElement('h2');
-  title.textContent = component.name;
-  title.style.marginBottom = '24px';
-  title.style.color = '#4ec9b0';
-  details.appendChild(title);
-
   // Props
   if (component.props && Object.keys(component.props).length > 0) {
-    const propsSection = createSection('Props', component.props);
+    const propsSection = createSection('props', component.props);
     details.appendChild(propsSection);
   }
 
-  // State
-  if (component.state !== null && component.state !== undefined) {
-    const stateSection = createSection('State', component.state);
+  // Hooks
+  if (component.state !== null && component.state !== undefined && component.state._isHooks) {
+    const hooksContainer = document.createElement('div');
+    hooksContainer.className = 'section';
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.textContent = 'hooks';
+    hooksContainer.appendChild(title);
+
+    component.state.hooks.forEach((hook, index) => {
+      const hookItem = document.createElement('div');
+      hookItem.className = 'hook-item';
+      hookItem.style.display = 'flex';
+      hookItem.style.marginBottom = '8px';
+
+      const idx = document.createElement('span');
+      idx.className = 'hook-index';
+      idx.textContent = index + 1;
+      hookItem.appendChild(idx);
+
+      const valContainer = document.createElement('div');
+      valContainer.style.flex = '1';
+
+      if (typeof hook.value === 'object' && hook.value !== null) {
+        renderObjectTree(hook.value, valContainer);
+      } else {
+        const valSpan = document.createElement('span');
+        valSpan.className = 'property-value';
+        valSpan.style.marginLeft = '0';
+        valSpan.textContent = formatValue(hook.value);
+        valContainer.appendChild(valSpan);
+      }
+
+      hookItem.appendChild(valContainer);
+      hooksContainer.appendChild(hookItem);
+    });
+    details.appendChild(hooksContainer);
+  } else if (component.state !== null && component.state !== undefined) {
+    const stateSection = createSection('state', component.state);
     details.appendChild(stateSection);
   }
 
-  // Context
-  if (component.context && Object.keys(component.context).length > 0) {
-    const contextSection = createSection('Context', component.context);
-    details.appendChild(contextSection);
+  // Rendered by
+  const renderedBySection = document.createElement('div');
+  renderedBySection.className = 'section';
+
+  const rbTitle = document.createElement('div');
+  rbTitle.className = 'section-title';
+  rbTitle.textContent = 'rendered by';
+  renderedBySection.appendChild(rbTitle);
+
+  const rbProperty = document.createElement('div');
+  rbProperty.className = 'property';
+
+  if (component.renderedBy && component.renderedBy !== 'Unknown' && component.renderedBy !== 'Anonymous') {
+    const parentSpan = document.createElement('span');
+    parentSpan.className = 'property-value';
+    parentSpan.style.color = '#61dafb';
+    parentSpan.style.marginLeft = '0';
+    parentSpan.style.cursor = 'pointer';
+    parentSpan.style.textDecoration = 'underline';
+    parentSpan.textContent = component.renderedBy;
+    rbProperty.appendChild(parentSpan);
+
+    const separator = document.createElement('span');
+    separator.textContent = ' in ';
+    separator.style.color = '#999';
+    separator.style.margin = '0 4px';
+    rbProperty.appendChild(separator);
   }
 
-  // Component bilgileri
-  const infoSection = document.createElement('div');
-  infoSection.className = 'section';
-  infoSection.innerHTML = `
-    <div class="section-title">Component Info</div>
-    <div class="property">
-      <span class="property-key">Type:</span>
-      <span class="property-value">${component.type}</span>
-    </div>
-    <div class="property">
-      <span class="property-key">Key:</span>
-      <span class="property-value">${component.key || 'null'}</span>
-    </div>
-    <div class="property">
-      <span class="property-key">Depth:</span>
-      <span class="property-value">${component.depth}</span>
-    </div>
-  `;
-  details.appendChild(infoSection);
+  const versionSpan = document.createElement('span');
+  versionSpan.className = 'property-value';
+  versionSpan.style.color = '#999';
+  versionSpan.style.marginLeft = '0';
+  versionSpan.textContent = `react-dom@${currentData.reactVersion}`;
+  rbProperty.appendChild(versionSpan);
 
-  // Redux (eğer varsa)
-  if (currentData.redux && currentData.redux.found) {
-    const reduxSection = createSection('Redux Store', currentData.redux.state);
-    details.appendChild(reduxSection);
+  renderedBySection.appendChild(rbProperty);
+  details.appendChild(renderedBySection);
+
+  // Source
+  if (component.source) {
+    const sourceSection = document.createElement('div');
+    sourceSection.className = 'section';
+    const fileName = component.source.fileName.split('/').pop();
+    sourceSection.innerHTML = `
+      <div class="section-title">source</div>
+      <div class="property">
+        <span class="property-value" style="color: #61dafb; cursor: pointer; margin-left: 0; text-decoration: underline;">
+          ${fileName}:${component.source.lineNumber}
+        </span>
+      </div>
+    `;
+    details.appendChild(sourceSection);
   }
+}
+
+function renderBreadcrumbs(component) {
+  const header = document.getElementById('details-header');
+  header.innerHTML = '';
+
+  const bc = document.createElement('div');
+  bc.className = 'breadcrumb';
+
+  const idBadge = document.createElement('span');
+  idBadge.className = 'breadcrumb-item';
+  // Use component index or similar to have a "stable-ish" mock ID
+  idBadge.textContent = component.id.split('-').pop().padStart(8, '0');
+  bc.appendChild(idBadge);
+
+  const name = document.createElement('span');
+  name.className = 'breadcrumb-current';
+  name.textContent = component.name;
+  bc.appendChild(name);
+
+  header.appendChild(bc);
 }
 
 // Section oluştur
@@ -294,11 +431,92 @@ function createSection(title, data) {
   titleEl.textContent = title;
   section.appendChild(titleEl);
 
-  const content = document.createElement('pre');
-  content.textContent = JSON.stringify(data, null, 2);
+  const content = document.createElement('div');
+  content.className = 'property-tree';
+
+  if (typeof data === 'object' && data !== null) {
+    renderObjectTree(data, content);
+  } else {
+    const simpleValue = document.createElement('div');
+    simpleValue.className = 'property';
+    const valSpan = document.createElement('span');
+    valSpan.className = 'property-value';
+    valSpan.textContent = formatValue(data);
+    simpleValue.appendChild(valSpan);
+    content.appendChild(simpleValue);
+  }
+
   section.appendChild(content);
 
   return section;
+}
+
+function formatValue(value) {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'string') return `"${value}"`;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return `Array(${value.length})`;
+  if (typeof value === 'object') return 'Object';
+  return String(value);
+}
+
+function renderObjectTree(obj, container, depth = 0) {
+  for (const key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+
+    const value = obj[key];
+    const isObject = typeof value === 'object' && value !== null;
+    const propertyEl = document.createElement('div');
+    propertyEl.className = 'property';
+
+    const keySpan = document.createElement('span');
+    keySpan.className = 'property-key';
+    keySpan.textContent = `${key}: `;
+    propertyEl.appendChild(keySpan);
+
+    if (isObject) {
+      const hasChildren = Object.keys(value).length > 0;
+      if (hasChildren) {
+        const toggle = document.createElement('span');
+        toggle.className = 'tree-toggle';
+        toggle.textContent = '▶';
+        propertyEl.insertBefore(toggle, keySpan);
+
+        const valuePreview = document.createElement('span');
+        valuePreview.className = 'property-value';
+        valuePreview.textContent = Array.isArray(value) ? `Array(${value.length})` : '{…}';
+        propertyEl.appendChild(valuePreview);
+
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'property-tree-children';
+        childrenContainer.style.display = 'none';
+
+        toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isExpanded = childrenContainer.style.display === 'block';
+          childrenContainer.style.display = isExpanded ? 'none' : 'block';
+          toggle.classList.toggle('expanded', !isExpanded);
+        });
+
+        renderObjectTree(value, childrenContainer, depth + 1);
+        container.appendChild(propertyEl);
+        container.appendChild(childrenContainer);
+      } else {
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'property-value';
+        valueSpan.textContent = Array.isArray(value) ? '[]' : '{}';
+        propertyEl.appendChild(valueSpan);
+        container.appendChild(propertyEl);
+      }
+    } else {
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'property-value';
+      valueSpan.textContent = formatValue(value);
+      propertyEl.appendChild(valueSpan);
+      container.appendChild(propertyEl);
+    }
+  }
 }
 
 // İstatistikleri göster
