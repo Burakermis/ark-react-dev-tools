@@ -52,15 +52,6 @@ function handleReactData(data) {
     return;
   }
 
-  // İlk yüklemede derin bileşenleri kapat
-  if (isFirstRender && data.components) {
-    data.components.forEach(comp => {
-      if (comp.depth >= MAX_INITIAL_DEPTH) {
-        collapsedIds.add(comp.id);
-      }
-    });
-    isFirstRender = false;
-  }
 
   renderComponentTree(data.components);
   renderStats(data);
@@ -83,9 +74,7 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 
 // Component tree'yi render et
 // Tree State
-const collapsedIds = new Set();
-let isFirstRender = true;
-const MAX_INITIAL_DEPTH = 0;
+const expandedIds = new Set();
 
 function buildTree(flatList) {
   const root = { id: 'virtual-root', children: [], depth: -1 };
@@ -142,7 +131,7 @@ function renderTreeNodes(nodes, container) {
     if (node.children && node.children.length > 0) {
       const childrenContainer = document.createElement('div');
       childrenContainer.className = 'tree-children';
-      childrenContainer.style.display = collapsedIds.has(node.id) ? 'none' : 'block';
+      childrenContainer.style.display = expandedIds.has(node.id) ? 'block' : 'none';
 
       renderTreeNodes(node.children, childrenContainer);
       container.appendChild(childrenContainer);
@@ -164,7 +153,7 @@ function createComponentNode(component) {
   toggle.className = 'tree-toggle';
   if (component.children && component.children.length > 0) {
     toggle.textContent = '▶';
-    if (!collapsedIds.has(component.id)) {
+    if (expandedIds.has(component.id)) {
       toggle.classList.add('expanded');
     }
 
@@ -217,10 +206,10 @@ function createComponentNode(component) {
 }
 
 function toggleComponent(id) {
-  if (collapsedIds.has(id)) {
-    collapsedIds.delete(id);
+  if (expandedIds.has(id)) {
+    expandedIds.delete(id);
   } else {
-    collapsedIds.add(id);
+    expandedIds.add(id);
   }
   // Re-render full tree with new state
   if (currentData && currentData.components) {
