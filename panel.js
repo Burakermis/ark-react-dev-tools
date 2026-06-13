@@ -16,6 +16,8 @@ backgroundPageConnection.postMessage({
 
 // Background'dan gelen mesajları dinle
 backgroundPageConnection.onMessage.addListener(function (message) {
+  if (!chrome.runtime?.id) return;
+
   if (message.type === 'REACT_DATA') {
     handleReactData(message.data);
   }
@@ -34,7 +36,22 @@ document.getElementById('refreshBtn').addEventListener('click', function () {
 // Sayfayı inspect et
 function inspectPage() {
   showLoading();
-  chrome.tabs.sendMessage(tabId, { type: 'INSPECT_PAGE' });
+  safeSendMessage({ type: 'INSPECT_PAGE' });
+}
+
+// Güvenli mesajlaşma yardımcısı
+function safeSendMessage(message) {
+  try {
+    if (chrome.runtime?.id) {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn('Messaging error:', chrome.runtime.lastError.message);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Failed to send message:', e);
+  }
 }
 
 function showLoading() {
@@ -206,11 +223,11 @@ function createComponentNode(component) {
   div.addEventListener('click', (e) => selectComponent(component));
 
   div.addEventListener('mouseenter', () => {
-    chrome.tabs.sendMessage(tabId, { type: 'HIGHLIGHT_COMPONENT', id: component.id });
+    safeSendMessage({ type: 'HIGHLIGHT_COMPONENT', id: component.id });
   });
 
   div.addEventListener('mouseleave', () => {
-    chrome.tabs.sendMessage(tabId, { type: 'HIDE_HIGHLIGHT' });
+    safeSendMessage({ type: 'HIDE_HIGHLIGHT' });
   });
 
   return div;

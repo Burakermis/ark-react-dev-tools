@@ -43,10 +43,12 @@
         type: 'REACT_INSPECTOR_HIGHLIGHT',
         id: request.id
       }, '*');
+      sendResponse({ success: true });
     } else if (request.type === 'HIDE_HIGHLIGHT') {
       window.postMessage({
         type: 'REACT_INSPECTOR_HIDE_HIGHLIGHT'
       }, '*');
+      sendResponse({ success: true });
     }
   });
 
